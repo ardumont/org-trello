@@ -6,6 +6,10 @@ EMACS=emacs
 
 .PHONY: clean
 
+pr:
+	# git is an alias to hub from github
+	git pull-request org-trello:master
+
 clean:
 	rm -rf *.tar $(PACKAGE_FOLDER)
 
