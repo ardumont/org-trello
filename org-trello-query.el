@@ -9,7 +9,7 @@
     (defalias 'cl-defun 'defun*)
     (defalias 'cl-destructuring-bind 'destructuring-bind)))
 
-(require 'request)
+(require 'request-deferred)
 (require 'org-trello-log)
 (require 'org-trello-setup)
 (require 'org-trello-data)
@@ -40,13 +40,29 @@
 
 (defun orgtrello-query/--get (server query-map &optional success-callback error-callback authentication-p)
   "Execute the GET request to SERVER with QUERY-MAP with optional SUCCESS-CALLBACK, ERROR-CALLBACK and AUTHENTICATION-P."
-  (request (->> query-map orgtrello-data/entity-uri (orgtrello-query/--compute-url server))
-           :sync    (orgtrello-data/entity-sync   query-map)
-           :type    (orgtrello-data/entity-method query-map)
-           :params  (orgtrello-data/merge-2-lists-without-duplicates (when authentication-p (orgtrello-query/--authentication-params)) (orgtrello-data/entity-params query-map))
-           :parser  'orgtrello-query/--http-parse
-           :success (if success-callback success-callback 'orgtrello-query/--standard-success-callback)
-           :error   (if error-callback error-callback 'orgtrello-query/--standard-error-callback)))
+  (let ((url              (->> query-map orgtrello-data/entity-uri (orgtrello-query/--compute-url server)))
+        (sync             (orgtrello-data/entity-sync query-map))
+        (type             (orgtrello-data/entity-method query-map))
+        (params           (orgtrello-data/merge-2-lists-without-duplicates (when authentication-p (orgtrello-query/--authentication-params)) (orgtrello-data/entity-params query-map)))
+        (parser-fn        'orgtrello-query/--http-parse)
+        (callback-success (if success-callback success-callback 'orgtrello-query/--standard-success-callback))
+        (callback-error   (if error-callback error-callback 'orgtrello-query/--standard-error-callback)))
+    (if sync
+        ;; synchronous request
+        (request url :sync sync :type type :params params :parser parser-fn :success callback-success :error callback-error)
+      ;; asynchronous
+      (deferred:$
+        (request-deferred url :type type :params params :parser parser-fn)
+        (deferred:nextc it
+          (lambda (response)
+            "Standard success callback. Simply displays a \"Success\" message in the minibuffer."
+            (-when-let (data (request-response-data response))
+              (orgtrello-log/msg *OT/NOLOG* "client - Proxy received and acknowledged the request%s" (if data (format " - response data: %S." data) ".")))))))))
+
+;; (--> (orgtrello-api/get-me)
+;;   ;;(orgtrello-data/put-entity-sync t it)
+;;   (orgtrello-query/--get *ORGTRELLO/TRELLO-URL* it nil nil 'authentication)
+;;   )
 
 (defun orgtrello-query/--post-or-put (server query-map &optional success-callback error-callback authentication-p)
   "Execute the POST/PUT request to SERVER with QUERY-MAP with optional SUCCESS-CALLBACK, ERROR-CALLBACK and AUTHENTICATION-P."
