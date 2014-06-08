@@ -60,29 +60,20 @@ If the VALUE is nil or empty, remove such PROPERTY."
         (goto-char start)
 	(setq indent (org-get-indentation))
 	(forward-line 1)
-        (setq lines
-              (cons
-               (orgtrello-buffer/filter-out-properties
-                (buffer-substring-no-properties start (min end (point))))
-               lines))
+        (push (orgtrello-buffer/filter-out-properties
+               (buffer-substring-no-properties start (min end (point))))
+              lines)
         (setq indent (orgtrello-buffer/check-indent! indent))
 	(while
             (< (point) end)
           (let ((sol (point)))
 	    (forward-line 1)
-            (setq lines
-                  (cons
-		   (buffer-substring-no-properties sol (min end (point)))
-		   lines)))
+            (push (buffer-substring-no-properties sol (min end (point))) lines))
           (setq indent (orgtrello-buffer/check-indent! indent)))))
-                                        ;(message "Lines: %S" lines)
-    (let ((result
-	   (when lines
-	     (orgtrello-buffer/filter-out-properties
-              (apply 'concat (reverse lines))))))
-      result)))
-
-
+    ;(message "Lines: %S" lines)
+    (when lines
+      (orgtrello-buffer/filter-out-properties
+       (apply 'concat (reverse lines))))))
 
 (defun orgtrello-buffer/get-card-comments! ()
   "Retrieve the card's comments. Can be nil if not on a card."
