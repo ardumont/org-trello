@@ -193,7 +193,7 @@ If the VALUE is nil or empty, remove such PROPERTY."
   (-when-let (card-desc (orgtrello-data/entity-description card))
     (let ((start (point)))
       (insert (format "%s" card-desc))
-	(indent-rigidly start (point) 2))))
+      (indent-rigidly start (point) 2))))
 
 (defun orgtrello-buffer/write-card! (card-id card entities adjacency)
   "Write the card and its structure inside the org buffer."
