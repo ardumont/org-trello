@@ -52,9 +52,9 @@ If the VALUE is nil or empty, remove such PROPERTY."
 (defun orgtrello-buffer/extract-description-from-current-position! ()
   "Given the current position, extract the text content of current card."
   (let* ((start (orgtrello-buffer/--card-description-start-point!))
-        (end   (orgtrello-buffer/--card-metadata-end-point!))
-        (indent nil)
-        (lines nil))
+         (end   (orgtrello-buffer/--card-metadata-end-point!))
+         (indent nil)
+         (lines nil))
     (when (< start end)
       (save-excursion
         (goto-char start)
@@ -62,24 +62,24 @@ If the VALUE is nil or empty, remove such PROPERTY."
 	(forward-line 1)
         (setq lines
               (cons
-                (orgtrello-buffer/filter-out-properties
-                  (buffer-substring-no-properties start (min end (point))))
-                lines))
+               (orgtrello-buffer/filter-out-properties
+                (buffer-substring-no-properties start (min end (point))))
+               lines))
         (setq indent (orgtrello-buffer/check-indent! indent))
 	(while
-          (< (point) end)
+            (< (point) end)
           (let ((sol (point)))
 	    (forward-line 1)
             (setq lines
                   (cons
 		   (buffer-substring-no-properties sol (min end (point)))
 		   lines)))
-        (setq indent (orgtrello-buffer/check-indent! indent)))))
-    ;(message "Lines: %S" lines)
+          (setq indent (orgtrello-buffer/check-indent! indent)))))
+                                        ;(message "Lines: %S" lines)
     (let ((result
 	   (when lines
 	     (orgtrello-buffer/filter-out-properties
-	     (apply 'concat (reverse lines))))))
+              (apply 'concat (reverse lines))))))
       result)))
 
 
