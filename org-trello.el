@@ -113,6 +113,26 @@ Please consider upgrading Emacs." emacs-version) "Error message when installing 
 
 
 
+(defun org-trello/apply-with-deferred (comp &optional current-buffer-to-save reload-org-setup nolog-p)
+  "Apply org-trello COMP which returns deferred computations.
+When CURRENT-BUFFER-TO-SAVE (buffer name) is provided, save such buffer.
+When RELOAD-ORG-SETUP is provided, reload the org setup.
+when NOLOG-P is specified, no output log."
+  (let ((deferred-fns (with-local-quit
+                        (save-excursion
+                          (apply (car comp) (cdr comp))))))
+    (--> deferred-fns
+      (cons 'deferred:$ it)
+      (-snoc it '(deferred:error it
+                   (lambda (x) (orgtrello-log/msg *OT/ERROR* "Problem during execution - '%s'!" x))))
+      (-snoc it `(deferred:nextc it
+                   (lambda ()
+                     (when ,current-buffer-to-save (with-current-buffer ,current-buffer-to-save
+                                                      (call-interactively 'save-buffer)))
+                     (when ,reload-org-setup (orgtrello-action/reload-setup!))
+                     (unless ,nolog-p (orgtrello-log/msg *OT/INFO* "Done!")))))
+      (eval it))))
+
 (defun org-trello/apply (comp &optional current-buffer-to-save reload-org-setup nolog-p)
   "Apply org-trello computation COMP.
 When CURRENT-BUFFER-TO-SAVE (buffer name) is provided, save such buffer.
@@ -135,19 +155,6 @@ when NOLOG-P is specified, no output log."
                                  (call-interactively 'save-buffer)))
           (when reload-setup (orgtrello-action/reload-setup!))
           (unless nolog-flag (orgtrello-log/msg *OT/INFO* "Done!")))))))
-
-;; (catch 'org-trello-timer-go-to-sleep
-;;   (-when-let (level-fns (->> *ORGTRELLO/LEVELS*
-;;                           (-mapcat 'orgtrello-proxy/--deal-with-level)
-;;                           (-filter 'identity)))
-;;     (--> level-fns
-;;       (mapcar (lambda (level-fn) `(deferred:nextc it ,level-fn)) it)
-;;       (-snoc it '(deferred:nextc it (lambda ()
-;;                                       (orgtrello-proxy/batch-save!)
-;;                                       (message "Actions on cards, checklists, items done!"))))
-;;       (cons '(deferred:next (lambda () (message "Actions on cards, checklists, items..."))) it)
-;;       (cons 'deferred:$ it)
-;;       (eval it))))
 
 (defun org-trello/log-strict-checks-and-do (action-label action-fn &optional with-save-flag)
   "Given an ACTION-LABEL and an ACTION-FN, execute sync action.
@@ -193,11 +200,9 @@ If NO-CHECK-FLAG is set, no controls are done."
   "Execute the sync of an entity and its structure to trello.
 If MODIFIER is non nil, execute the sync entity and its structure from trello."
   (interactive "P")
-  (org-trello/apply (cons 'org-trello/log-strict-checks-and-do
-                          (if modifier
-                              '("Request 'sync entity with structure from trello" orgtrello-controller/do-sync-card-from-trello!)
-                            '("Request 'sync entity with structure to trello" orgtrello-controller/do-sync-card-to-trello!)))
-                    (current-buffer)))
+  (if modifier
+      (org-trello/apply '(org-trello/log-strict-checks-and-do "Request 'sync entity with structure from trello" orgtrello-controller/do-sync-card-from-trello!) (current-buffer))
+    (org-trello/apply-with-deferred '(org-trello/log-strict-checks-and-do "Request 'sync entity with structure to trello" orgtrello-controller/do-sync-card-to-trello!) (current-buffer))))
 
 (defun org-trello/sync-buffer (&optional modifier)
   "Execute the sync of the entire buffer to trello.

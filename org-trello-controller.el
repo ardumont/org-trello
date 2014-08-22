@@ -215,16 +215,31 @@ No synchronization is done."
     (cons buffer-name)
     (apply 'orgtrello-buffer/compute-entities-from-org-buffer!)))
 
+(defun orgtrello-controller/deferred-computations (computation-fns)
+  "Compute a list of deferred COMPUTATION-FNS."
+  (-when-let (fns computation-fns)
+    (--> fns
+      (mapcar (lambda (fn) `(deferred:nextc it ,fn)) it)
+        (-snoc it '(deferred:nextc it (lambda ()
+                                        (message "Actions on cards, checklists, items done!"))))
+        (cons '(deferred:next (lambda () (message "Actions on cards, checklists, items..."))) it)
+        ;; (cons 'deferred:$ it)
+        ;; (eval it)
+        )))
+
 (defun orgtrello-controller/execute-sync-entity-structure! (entity-structure)
   "Execute synchronization of ENTITY-STRUCTURE (entities at first position, adjacency list in second position).
 The entity-structure is self contained.
-Synchronization is done here.
-Along the way, the buffer BUFFER-NAME is written with new informations."
-  (let ((entities (car entity-structure)))
+Synchronization is done here."
+  (let ((entities              (car entity-structure))
+        (deferred-computations nil))
     (maphash (lambda (id entity)
-               (-> entity
-                 (orgtrello-controller/--do-action-on-entity! *ORGTRELLO/ACTION-SYNC*)))
-             entities)))
+               (push `(lambda () (with-local-quit
+                                   (orgtrello-controller/--do-action-on-entity! ,entity ,*ORGTRELLO/ACTION-SYNC*))) deferred-computations))
+             entities)
+    (-> deferred-computations
+      nreverse
+      orgtrello-controller/deferred-computations)))
 
 (defun orgtrello-controller/fetch-and-overwrite-card! (card)
   "Given a card, retrieve latest information from trello and overwrite in current buffer."
